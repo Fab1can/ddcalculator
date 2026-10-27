@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111827">
+<title>Calcolatrice duodecimale</title>
+<style>
+  :root { color-scheme: dark; --bg:#0b1020; --panel:#151d31; --key:#222d45; --key-hover:#2d3b59; --accent:#7cdbca; --accent-ink:#09201d; --text:#edf3ff; --muted:#9aa8c4; --danger:#ef8796; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:grid; place-items:center; padding:24px; background:radial-gradient(ellipse at top,#1b2c49 0%,var(--bg) 60%); color:var(--text); font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  main { width:min(100%,430px); }
+  header { margin:0 0 18px; }
+  h1 { font-size:1.45rem; letter-spacing:-.035em; margin:0 0 5px; }
+  header p { margin:0; color:var(--muted); font-size:.92rem; }
+  .calculator { padding:18px; background:color-mix(in srgb,var(--panel) 94%,transparent); border:1px solid #293650; border-radius:24px; box-shadow:0 24px 80px #0006; }
+  .screen { min-height:128px; display:flex; flex-direction:column; justify-content:flex-end; gap:12px; padding:16px 12px 20px; margin-bottom:14px; border-radius:16px; background:#0b1222; border:1px solid #27334a; overflow:hidden; }
+  #expression { min-height:24px; color:var(--muted); font-size:1.05rem; text-align:right; overflow-wrap:anywhere; }
+  #result { text-align:right; font-size:clamp(2rem,9vw,3rem); line-height:1.15; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+  #status { min-height:18px; font-size:.75rem; text-align:right; color:var(--muted); }
+  .keys { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:9px; }
+  button { border:1px solid transparent; min-height:57px; border-radius:14px; background:var(--key); color:var(--text); font:600 1.18rem inherit; font-size:1.18rem; cursor:pointer; transition:background .12s,transform .08s; touch-action:manipulation; }
+  button:hover { background:var(--key-hover); }
+  button:active { transform:scale(.97); }
+  button:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+  .utility { color:#f2b9c1; background:#3a2537; }
+  .operator { color:var(--accent); background:#173b3c; }
+  .operator:hover { background:#20504f; }
+  .equals { background:var(--accent); color:var(--accent-ink); font-size:1.45rem; }
+  .equals:hover { background:#a0eddf; }
+  .digit-special { color:#d9c7ff; }
+  .zero { grid-column:span 2; }
+  .hint { margin:14px 2px 0; color:var(--muted); font-size:.8rem; line-height:1.5; }
+  kbd { font:inherit; color:var(--text); background:#26324a; border-radius:4px; padding:1px 5px; }
+  @media (max-width:360px) { body { padding:12px; } .calculator { padding:12px; } .keys { gap:7px; } button { min-height:51px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Calcolatrice duodecimale</h1>
+    <p>Aritmetica in base 12, dall’input al risultato.</p>
+  </header>
+  <section class="calculator" aria-label="Calcolatrice in base dodici">
+    <div class="screen" aria-live="polite">
+      <div id="expression">0</div>
+      <div id="result">0</div>
+      <div id="status">Cifre: 0–9, ↊ (dieci), ↋ (undici)</div>
+    </div>
+    <div class="keys">
+      <button class="utility" data-action="clear" aria-label="Cancella tutto">AC</button>
+      <button class="utility" data-action="backspace" aria-label="Cancella ultimo carattere">⌫</button>
+      <button class="operator" data-value="(">(</button>
+      <button class="operator" data-value=")">)</button>
+
+      <button data-value="7">7</button><button data-value="8">8</button><button data-value="9">9</button><button class="operator" data-value="÷">÷</button>
+      <button data-value="4">4</button><button data-value="5">5</button><button data-value="6">6</button><button class="operator" data-value="×">×</button>
+      <button data-value="1">1</button><button data-value="2">2</button><button data-value="3">3</button><button class="operator" data-value="−">−</button>
+      <button class="digit-special" data-value="↊">↊</button><button class="digit-special" data-value="↋">↋</button><button data-value=".">.</button><button class="operator" data-value="+">+</button>
+      <button class="zero" data-value="0">0</button><button class="operator" data-action="sign">±</button><button class="equals" data-action="equals">=</button>
+    </div>
+  </section>
+  <p class="hint">Puoi usare anche la tastiera: <kbd>0–9</kbd>, <kbd>+</kbd>, <kbd>-</kbd>, <kbd>*</kbd>, <kbd>/</kbd>, parentesi e <kbd>Enter</kbd>. I risultati frazionari vengono mostrati fino a 24 cifre duodecimali; <kbd>↊</kbd> vale dieci e <kbd>↋</kbd> vale undici.</p>
+</main>
+<script>
+(() => {
+  const DIGITS = "0123456789↊↋";
+  const $expr = document.getElementById("expression");
+  const $result = document.getElementById("result");
+  const $status = document.getElementById("status");
+  let expression = "";
+  let justEvaluated = false;
+
+  const gcd = (a,b) => { a=a<0n?-a:a; b=b<0n?-b:b; while(b){const t=a%b;a=b;b=t;} return a || 1n; };
+  function frac(n,d=1n) {
+    if(d===0n) throw Error("Divisione per zero");
+    if(d<0n){n=-n;d=-d;}
+    const g=gcd(n,d); return {n:n/g,d:d/g};
+  }
+  const add=(a,b)=>frac(a.n*b.d+b.n*a.d,a.d*b.d);
+  const sub=(a,b)=>frac(a.n*b.d-b.n*a.d,a.d*b.d);
+  const mul=(a,b)=>frac(a.n*b.n,a.d*b.d);
+  const div=(a,b)=>{if(b.n===0n)throw Error("Divisione per zero");return frac(a.n*b.d,a.d*b.n);};
+  function parseNumber(s) {
+    const parts=s.split(".");
+    if(parts.length>2) throw Error("Numero non valido");
+    const whole=parts[0] || "0", dec=parts[1] || "";
+    let n=0n;
+    for(const ch of whole+dec){const v=DIGITS.indexOf(ch); if(v<0)throw Error("Cifra non valida"); n=n*12n+BigInt(v);}
+    return frac(n,12n**BigInt(dec.length));
+  }
+  function toBase12(n) {
+    if(n===0n)return "0";
+    let out="";
+    while(n>0n){out=DIGITS[Number(n%12n)]+out;n/=12n;}
+    return out;
+  }
+  function formatFraction(x) {
+    const negative=x.n<0n, n=negative?-x.n:x.n;
+    const integer=n/x.d, rem=n%x.d;
+    let out=toBase12(integer);
+    if(rem!==0n){
+      let r=rem, digits="", seen=new Map(), repeatingAt=-1;
+      for(let i=0;i<24 && r!==0n;i++){
+        if(seen.has(r.toString())){repeatingAt=seen.get(r.toString());break;}
+        seen.set(r.toString(),digits.length);
+        r*=12n; digits+=DIGITS[Number(r/x.d)]; r%=x.d;
+      }
+      if(repeatingAt>=0) digits=digits.slice(0,repeatingAt)+"("+digits.slice(repeatingAt)+")";
+      else if(r!==0n) digits+="…";
+      out+="."+digits;
+    }
+    return (negative?"−":"")+out;
+  }
+  function tokenize(s) {
+    const tokens=[]; let i=0;
+    while(i<s.length){
+      const c=s[i];
+      if(c===" "){i++;continue;}
+      if(DIGITS.includes(c)||c==="."){
+        let num="", dots=0;
+        while(i<s.length && (DIGITS.includes(s[i])||s[i]===".")){
+          if(s[i]===".")dots++;
+          num+=s[i++];
+        }
+        if(dots>1 || num===".")throw Error("Numero non valido");
+        tokens.push({type:"num",value:parseNumber(num)}); continue;
+      }
+      if("()+−×÷-*/".includes(c)){tokens.push({type:"op",value:c});i++;continue;}
+      throw Error("Carattere non valido");
+    }
+    // Normalizza il meno ASCII e inserisce lo zero nei segni unari.
+    const normalized=[];
+    for(let j=0;j<tokens.length;j++){
+      let t=tokens[j];
+      if(t.type==="op" && t.value==="-")t={...t,value:"−"};
+      const prev=normalized[normalized.length-1];
+      if(t.type==="op" && t.value==="−" && (!prev || (prev.type==="op" && prev.value!==")") )){
+        normalized.push({type:"num",value:frac(0n)});
+      }
+      normalized.push(t);
+    }
+    return normalized;
+  }
+  function evaluate(s) {
+    const ts=tokenize(s); let p=0;
+    function primary(){
+      const t=ts[p++];
+      if(!t)throw Error("Espressione incompleta");
+      if(t.type==="num")return t.value;
+      if(t.type==="op"&&t.value==="("){const v=expr(0);if(!ts[p]||ts[p].value!==")")throw Error("Parentesi non chiusa");p++;return v;}
+      throw Error("Espressione non valida");
+    }
+    const precedence={"+":1,"−":1,"×":2,"÷":2,"*":2,"/":2};
+    function expr(min){
+      let left=primary();
+      while(p<ts.length){
+        const t=ts[p]; if(t.type!=="op"||!(t.value in precedence)||precedence[t.value]<min)break;
+        p++; const right=expr(precedence[t.value]+1);
+        if(t.value==="+")left=add(left,right);
+        else if(t.value==="−")left=sub(left,right);
+        else if(t.value==="×"||t.value==="*")left=mul(left,right);
+        else left=div(left,right);
+      }
+      return left;
+    }
+    if(!ts.length) return frac(0n);
+    const value=expr(0);
+    if(p!==ts.length)throw Error("Controlla l’espressione");
+    return value;
+  }
+  function render() {
+    $expr.textContent=expression||"0";
+    if(!expression){$result.textContent="0";$status.textContent="Cifre: 0–9, ↊ (dieci), ↋ (undici)";return;}
+    try{$result.textContent=formatFraction(evaluate(expression));$status.textContent="Risultato in base 12";}
+    catch(e){$result.textContent="…";$status.textContent=e.message==="Divisione per zero"?"Divisione per zero":"Espressione in corso";}
+  }
+  function append(value) {
+    if(justEvaluated && (DIGITS.includes(value)||value==="."||value==="(")) expression="";
+    justEvaluated=false;
+    const last=expression.slice(-1);
+    if(value==="." && (!last || !DIGITS.includes(last)) ) expression+="0";
+    expression+=value; render();
+  }
+  function calculate() {
+    try {const result=formatFraction(evaluate(expression)); expression=result.replace(/−/g,"-").replace(/\(([^()]*)\)/g,"$1"); $expr.textContent=expression; $result.textContent=result; $status.textContent="Risultato in base 12"; justEvaluated=true;}
+    catch(e){$status.textContent=e.message; $result.textContent="Errore";}
+  }
+  function sign() {
+    if(!expression)return;
+    // Wrap the current expression in a negation without introducing a decimal-base conversion.
+    expression="(0−("+expression+"))"; justEvaluated=false;render();
+  }
+  document.querySelector(".keys").addEventListener("click", e=>{
+    const b=e.target.closest("button"); if(!b)return;
+    const action=b.dataset.action, value=b.dataset.value;
+    if(action==="clear"){expression="";justEvaluated=false;render();}
+    else if(action==="backspace"){expression=expression.slice(0,-1);justEvaluated=false;render();}
+    else if(action==="equals")calculate();
+    else if(action==="sign")sign();
+    else if(value)append(value);
+  });
+  document.addEventListener("keydown",e=>{
+    if(e.ctrlKey||e.metaKey||e.altKey)return;
+    const k=e.key;
+    if(DIGITS.includes(k)){append(k);e.preventDefault();}
+    else if(k==="."){append(".");e.preventDefault();}
+    else if(k==="+"){append("+");e.preventDefault();}
+    else if(k==="-"){append("−");e.preventDefault();}
+    else if(k==="*"){append("×");e.preventDefault();}
+    else if(k==="/"){append("÷");e.preventDefault();}
+    else if(k==="("||k===")"){append(k);e.preventDefault();}
+    else if(k==="Enter"||k==="="){calculate();e.preventDefault();}
+    else if(k==="Backspace"){expression=expression.slice(0,-1);justEvaluated=false;render();e.preventDefault();}
+    else if(k==="Escape"){expression="";justEvaluated=false;render();e.preventDefault();}
+  });
+  render();
+})();
+</script>
+</body>
+</html>
