@@ -1,10 +1,10 @@
 <!doctype html>
-<html lang="it">
+<html lang="zxx">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#111827">
-<title>Calcolatrice duodecimale</title>
+<title>Base 12</title>
 <style>
   :root { color-scheme: dark; --bg:#0b1020; --panel:#151d31; --key:#222d45; --key-hover:#2d3b59; --accent:#7cdbca; --accent-ink:#09201d; --text:#edf3ff; --muted:#9aa8c4; --danger:#ef8796; }
   * { box-sizing:border-box; }
@@ -38,18 +38,18 @@
 <body>
 <main>
   <header>
-    <h1>Calcolatrice duodecimale</h1>
-    <p>Aritmetica in base 12, dall’input al risultato.</p>
+    <h1>BASE 12</h1>
+    
   </header>
   <section class="calculator" aria-label="Calcolatrice in base dodici">
     <div class="screen" aria-live="polite">
       <div id="expression">0</div>
       <div id="result">0</div>
-      <div id="status">Cifre: 0–9, ↊ (dieci), ↋ (undici)</div>
+      <div id="status"></div>
     </div>
     <div class="keys">
-      <button class="utility" data-action="clear" aria-label="Cancella tutto">AC</button>
-      <button class="utility" data-action="backspace" aria-label="Cancella ultimo carattere">⌫</button>
+      <button class="utility" data-action="clear" aria-label="AC">AC</button>
+      <button class="utility" data-action="backspace" aria-label="⌫">⌫</button>
       <button class="operator" data-value="(">(</button>
       <button class="operator" data-value=")">)</button>
 
@@ -60,11 +60,11 @@
       <button class="zero" data-value="0">0</button><button class="operator" data-action="sign">±</button><button class="equals" data-action="equals">=</button>
     </div>
   </section>
-  <p class="hint">Puoi usare anche la tastiera: <kbd>0–9</kbd>, <kbd>+</kbd>, <kbd>-</kbd>, <kbd>*</kbd>, <kbd>/</kbd>, parentesi e <kbd>Enter</kbd>. I risultati frazionari vengono mostrati fino a 24 cifre duodecimali; <kbd>↊</kbd> vale dieci e <kbd>↋</kbd> vale undici.</p>
+  
 </main>
 <script>
 (() => {
-  const DIGITS = "0123456789↊↋";
+  const DIGITS = "0123456789@#";
   const $expr = document.getElementById("expression");
   const $result = document.getElementById("result");
   const $status = document.getElementById("status");
@@ -73,20 +73,20 @@
 
   const gcd = (a,b) => { a=a<0n?-a:a; b=b<0n?-b:b; while(b){const t=a%b;a=b;b=t;} return a || 1n; };
   function frac(n,d=1n) {
-    if(d===0n) throw Error("Divisione per zero");
+    if(d===0n) throw Error("÷ 0");
     if(d<0n){n=-n;d=-d;}
     const g=gcd(n,d); return {n:n/g,d:d/g};
   }
   const add=(a,b)=>frac(a.n*b.d+b.n*a.d,a.d*b.d);
   const sub=(a,b)=>frac(a.n*b.d-b.n*a.d,a.d*b.d);
   const mul=(a,b)=>frac(a.n*b.n,a.d*b.d);
-  const div=(a,b)=>{if(b.n===0n)throw Error("Divisione per zero");return frac(a.n*b.d,a.d*b.n);};
+  const div=(a,b)=>{if(b.n===0n)throw Error("÷ 0");return frac(a.n*b.d,a.d*b.n);};
   function parseNumber(s) {
     const parts=s.split(".");
-    if(parts.length>2) throw Error("Numero non valido");
+    if(parts.length>2) throw Error("…");
     const whole=parts[0] || "0", dec=parts[1] || "";
     let n=0n;
-    for(const ch of whole+dec){const v=DIGITS.indexOf(ch); if(v<0)throw Error("Cifra non valida"); n=n*12n+BigInt(v);}
+    for(const ch of whole+dec){const v=DIGITS.indexOf(ch); if(v<0)throw Error("…"); n=n*12n+BigInt(v);}
     return frac(n,12n**BigInt(dec.length));
   }
   function toBase12(n) {
@@ -123,7 +123,7 @@
           if(s[i]===".")dots++;
           num+=s[i++];
         }
-        if(dots>1 || num===".")throw Error("Numero non valido");
+        if(dots>1 || num===".")throw Error("…");
         tokens.push({type:"num",value:parseNumber(num)}); continue;
       }
       if("()+−×÷-*/".includes(c)){tokens.push({type:"op",value:c});i++;continue;}
@@ -146,10 +146,10 @@
     const ts=tokenize(s); let p=0;
     function primary(){
       const t=ts[p++];
-      if(!t)throw Error("Espressione incompleta");
+      if(!t)throw Error("…");
       if(t.type==="num")return t.value;
-      if(t.type==="op"&&t.value==="("){const v=expr(0);if(!ts[p]||ts[p].value!==")")throw Error("Parentesi non chiusa");p++;return v;}
-      throw Error("Espressione non valida");
+      if(t.type==="op"&&t.value==="("){const v=expr(0);if(!ts[p]||ts[p].value!==")")throw Error("…");p++;return v;}
+      throw Error("…");
     }
     const precedence={"+":1,"−":1,"×":2,"÷":2,"*":2,"/":2};
     function expr(min){
@@ -166,14 +166,14 @@
     }
     if(!ts.length) return frac(0n);
     const value=expr(0);
-    if(p!==ts.length)throw Error("Controlla l’espressione");
+    if(p!==ts.length)throw Error("…");
     return value;
   }
   function render() {
     $expr.textContent=expression||"0";
-    if(!expression){$result.textContent="0";$status.textContent="Cifre: 0–9, ↊ (dieci), ↋ (undici)";return;}
-    try{$result.textContent=formatFraction(evaluate(expression));$status.textContent="Risultato in base 12";}
-    catch(e){$result.textContent="…";$status.textContent=e.message==="Divisione per zero"?"Divisione per zero":"Espressione in corso";}
+    if(!expression){$result.textContent="0";$status.textContent="";return;}
+    try{$result.textContent=formatFraction(evaluate(expression));$status.textContent="";}
+    catch(e){$result.textContent="…";$status.textContent=e.message==="÷ 0"?"÷ 0":"";}
   }
   function append(value) {
     if(justEvaluated && (DIGITS.includes(value)||value==="."||value==="(")) expression="";
@@ -183,8 +183,8 @@
     expression+=value; render();
   }
   function calculate() {
-    try {const result=formatFraction(evaluate(expression)); expression=result.replace(/−/g,"-").replace(/\(([^()]*)\)/g,"$1"); $expr.textContent=expression; $result.textContent=result; $status.textContent="Risultato in base 12"; justEvaluated=true;}
-    catch(e){$status.textContent=e.message; $result.textContent="Errore";}
+    try {const result=formatFraction(evaluate(expression)); expression=result.replace(/−/g,"-").replace(/\(([^()]*)\)/g,"$1"); $expr.textContent=expression; $result.textContent=result; $status.textContent=""; justEvaluated=true;}
+    catch(e){$status.textContent=""; $result.textContent="!";}
   }
   function sign() {
     if(!expression)return;
